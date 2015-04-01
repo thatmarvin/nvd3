@@ -233,7 +233,8 @@ nv.models.lineChart = function() {
                         allData.push({
                             key: series.key,
                             value: chart.y()(point, pointIndex),
-                            color: color(series,series.seriesIndex)
+                            color: color(series, series.seriesIndex),
+                            custom: series.custom || {}
                         });
                     });
                 //Highlight the tooltip entry based on which point the mouse is closest to.
