@@ -242,12 +242,17 @@
                         .duration(0)
                         .style('opacity', 0);
                 } else {
+                    var prefix = '-webkit-transform' in document.body.style ? '-webkit-'
+                        : '-moz-transform' in document.body.style ? '-moz-'
+                        : '-ms-transform' in document.body.style ? '-ms-'
+                        : '';
+
                     tooltip
                         .interrupt() // cancel running transitions
                         .transition()
                         .duration(is_hidden ? 0 : duration)
                         // using tween since some versions of d3 can't auto-tween a translate on a div
-                        .styleTween('transform', function (d) {
+                        .styleTween(prefix + 'transform', function (d) {
                             return translateInterpolator;
                         })
                         .style('opacity', 1);
