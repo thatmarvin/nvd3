@@ -252,7 +252,7 @@ nv.models.linePlusBarChart = function() {
             // context (focus chart) axis controls
             if (focusShowAxisX) {
                 x2Axis
-                    .ticks(x2Axis.ticks() ? x2Axis.ticks() : nv.utils.calcTicksX(availableWidth / 100, data))
+                    ._ticks( nv.utils.calcTicksX(availableWidth / 100, data))
                     .tickSize(-availableHeight2, 0);
                 g.select('.nv-context .nv-x.nv-axis')
                     .attr('transform', 'translate(0,' + y3.range()[0] + ')');
@@ -263,11 +263,11 @@ nv.models.linePlusBarChart = function() {
             if (focusShowAxisY) {
                 y3Axis
                     .scale(y3)
-                    .ticks(y3Axis.ticks() ? y3Axis.ticks() : availableHeight2 / 36 )
+                    ._ticks( availableHeight2 / 36 )
                     .tickSize( -availableWidth, 0);
                 y4Axis
                     .scale(y4)
-                    .ticks(y4Axis.ticks() ? y4Axis.ticks() : availableHeight2 / 36 )
+                    ._ticks( availableHeight2 / 36 )
                     .tickSize(dataBars.length ? 0 : -availableWidth, 0); // Show the y2 rules only if y1 has none
 
                 g.select('.nv-context .nv-y3.nv-axis')
@@ -430,7 +430,7 @@ nv.models.linePlusBarChart = function() {
 
                 xAxis
                     .scale(x)
-                    .ticks(xAxis.ticks() ? xAxis.ticks() : nv.utils.calcTicksX(availableWidth/100, data) )
+                    ._ticks( nv.utils.calcTicksX(availableWidth/100, data) )
                     .tickSize(-availableHeight1, 0);
 
                 xAxis.domain([Math.ceil(extent[0]), Math.floor(extent[1])]);
@@ -448,11 +448,11 @@ nv.models.linePlusBarChart = function() {
 
                 y1Axis
                     .scale(y1)
-                    .ticks(y1Axis.ticks() ? y1Axis.ticks() : nv.utils.calcTicksY(availableHeight1/36, data) )
+                    ._ticks( nv.utils.calcTicksY(availableHeight1/36, data) )
                     .tickSize(-availableWidth, 0);
                 y2Axis
                     .scale(y2)
-                    .ticks(y2Axis.ticks() ? y2Axis.ticks() : nv.utils.calcTicksY(availableHeight1/36, data) )
+                    ._ticks( nv.utils.calcTicksY(availableHeight1/36, data) )
                     .tickSize(dataBars.length ? 0 : -availableWidth, 0); // Show the y2 rules only if y1 has none
 
                 g.select('.nv-focus .nv-y1.nv-axis')
@@ -479,11 +479,6 @@ nv.models.linePlusBarChart = function() {
     //------------------------------------------------------------
 
     lines.dispatch.on('elementMouseover.tooltip', function(evt) {
-        evt.value = evt.point.x;
-        evt.series = {
-            value: evt.point.y,
-            color: evt.point.color
-        };
         tooltip
             .duration(100)
             .valueFormatter(function(d, i) {
@@ -499,9 +494,9 @@ nv.models.linePlusBarChart = function() {
     });
 
     bars.dispatch.on('elementMouseover.tooltip', function(evt) {
-        evt.value = evt.data.x;
+        evt.value = chart.x()(evt.data);
         evt['series'] = {
-            value: evt.data.y,
+            value: chart.y()(evt.data),
             color: evt.color
         };
         tooltip

@@ -5,7 +5,7 @@
     <link href="../build/nv.d3.css" rel="stylesheet" type="text/css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.2/d3.min.js" charset="utf-8"></script>
     <script src="../build/nv.d3.js"></script>
-    <script src="lib/stream_layers.js"></script>
+    <script src="../examples/lib/stream_layers.js"></script>
 
     <style>
         text {
@@ -51,13 +51,27 @@
     });
 
     function testData() {
-        return stream_layers(3,128,.1).map(function(data, i) {
+        var data = stream_layers(3,128,.1).map(function(data, i) {
             return {
                 key: 'Stream' + i,
                 area: i === 1,
                 values: data
             };
         });
+
+        // Set some y data to null
+        var i, j, d, o;
+        for(i = 0; i < data.length; i++) {
+            d = data[i];
+            for(j = 0; j < d.values.length; j++) {
+                o = d.values[j];
+                if (j % (i + 5) == 0) {
+                    o.y = null;
+                }
+            }
+        }
+        console.log(data);
+        return data;
     }
 
 </script>

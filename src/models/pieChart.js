@@ -123,19 +123,18 @@ nv.models.pieChart = function() {
                     wrap.select('.nv-legendWrap')
                         .attr('transform', 'translate(0,' + (-margin.top) +')');
                 } else if (legendPosition === "right") {
-                    legend.height(availableHeight).width(availableWidth - availableHeight).key(pie.x());
+                    var legendWidth = nv.models.legend().width();
+                    if (availableWidth / 2 < legendWidth) {
+                        legendWidth = (availableWidth / 2)
+                    }
+                    legend.height(availableHeight).key(pie.x());
+                    legend.width(legendWidth);
+                    availableWidth -= legend.width();
 
                     wrap.select('.nv-legendWrap')
                         .datum(data)
-                        .call(legend);
-
-                    if ( margin.right != legend.width()) {
-                        margin.right = legend.width();
-                        availableWidth = nv.utils.availableWidth(width, container, margin);
-                    }
-
-                    wrap.select('.nv-legendWrap')
-                        .attr('transform', 'translate(' + (margin.left + availableHeight) +',0)');
+                        .call(legend)
+                        .attr('transform', 'translate(' + (availableWidth) +',0)');
                 }
             }
             wrap.attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
@@ -179,8 +178,8 @@ nv.models.pieChart = function() {
 
     pie.dispatch.on('elementMouseover.tooltip', function(evt) {
         evt['series'] = {
-            key: evt.data.key,
-            value: evt.data.y,
+            key: chart.x()(evt.data),
+            value: chart.y()(evt.data),
             color: evt.color
         };
         tooltip.data(evt).hidden(false);
@@ -202,6 +201,7 @@ nv.models.pieChart = function() {
     chart.legend = legend;
     chart.dispatch = dispatch;
     chart.pie = pie;
+    chart.tooltip = tooltip;
     chart.options = nv.utils.optionsFunc.bind(chart);
 
     // use Object get/set functionality to map between vars and chart functions

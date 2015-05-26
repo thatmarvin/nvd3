@@ -205,7 +205,7 @@ nv.models.multiChart = function() {
             if(dataLines2.length){d3.transition(lines2Wrap).call(lines2);}
 
             xAxis
-                .ticks( nv.utils.calcTicksX(availableWidth/100, data) )
+                ._ticks( nv.utils.calcTicksX(availableWidth/100, data) )
                 .tickSize(-availableHeight, 0);
 
             g.select('.nv-x.nv-axis')
@@ -214,7 +214,7 @@ nv.models.multiChart = function() {
                 .call(xAxis);
 
             yAxis1
-                .ticks( nv.utils.calcTicksY(availableHeight/36, data) )
+                ._ticks( nv.utils.calcTicksY(availableHeight/36, data) )
                 .tickSize( -availableWidth, 0);
 
 
@@ -222,7 +222,7 @@ nv.models.multiChart = function() {
                 .call(yAxis1);
 
             yAxis2
-                .ticks( nv.utils.calcTicksY(availableHeight/36, data) )
+                ._ticks( nv.utils.calcTicksY(availableHeight/36, data) )
                 .tickSize( -availableWidth, 0);
 
             d3.transition(g.select('.nv-y2.nv-axis'))
@@ -263,25 +263,24 @@ nv.models.multiChart = function() {
 
             function mouseover_stack(evt) {
                 var yaxis = data[evt.seriesIndex].yAxis === 2 ? yAxis2 : yAxis1;
-                var pos = {left: evt.pos[0] +  margin.left, top: evt.pos[1] + margin.top};
-                evt.point['x'] = evt.point['x'] || evt.point[0];
-                evt.point['y'] = evt.point['y'] || evt.point[1];
+                evt.point['x'] = stack1.x()(evt.point);
+                evt.point['y'] = stack1.y()(evt.point);
                 tooltip
                     .duration(100)
                     .valueFormatter(function(d, i) {
                         return yaxis.tickFormat()(d, i);
                     })
                     .data(evt)
-                    .position(pos)
+                    .position(evt.pos)
                     .hidden(false);
             }
 
             function mouseover_bar(evt) {
                 var yaxis = data[evt.data.series].yAxis === 2 ? yAxis2 : yAxis1;
 
-                evt.value = evt.data.x;
+                evt.value = bars1.x()(evt.data);
                 evt['series'] = {
-                    value: evt.data.y,
+                    value: bars1.y()(evt.data),
                     color: evt.color
                 };
                 tooltip
@@ -385,12 +384,20 @@ nv.models.multiChart = function() {
         x: {get: function(){return getX;}, set: function(_){
             getX = _;
             lines1.x(_);
+            lines2.x(_);
             bars1.x(_);
+            bars2.x(_);
+            stack1.x(_);
+            stack2.x(_);
         }},
         y: {get: function(){return getY;}, set: function(_){
             getY = _;
             lines1.y(_);
+            lines2.y(_);
+            stack1.y(_);
+            stack2.y(_);
             bars1.y(_);
+            bars2.y(_);
         }},
         useVoronoi: {get: function(){return useVoronoi;}, set: function(_){
             useVoronoi=_;

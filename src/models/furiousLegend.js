@@ -1,4 +1,4 @@
-nv.models.legend = function() {
+nv.models.furiousLegend = function() {
     "use strict";
 
     //============================================================
@@ -11,7 +11,7 @@ nv.models.legend = function() {
         , getKey = function(d) { return d.key }
         , color = nv.utils.getColor()
         , align = true
-        , padding = 32 //define how much space between legend items. - recommend 32 for furious version
+        , padding = 28 //define how much space between legend items. - recommend 32 for furious version
         , rightAlign = true
         , updateState = true   //If true, legend will update data.disabled and trigger a 'stateChange' dispatch.
         , radioButtonMode = false   //If true, clicking legend items will cause it to behave like a radio button. (only one can be selected at a time)
@@ -41,18 +41,9 @@ nv.models.legend = function() {
                         return expanded ? true : !n.disengaged;
                     });
                 });
+            var seriesEnter = series.enter().append('g').attr('class', 'nv-series')
 
-            var seriesEnter = series.enter().append('g').attr('class', 'nv-series');
             var seriesShape;
-
-            var versPadding;
-            switch(vers) {
-                case 'furious' :
-                    versPadding = 23;
-                    break;
-                case 'classic' :
-                    versPadding = 20;
-            }
 
             if(vers == 'classic') {
                 seriesEnter.append('circle')
@@ -68,7 +59,7 @@ nv.models.legend = function() {
                     .attr('rx', 3)
                     .attr('ry', 3);
 
-                seriesShape = series.select('.nv-legend-symbol');
+                seriesShape = series.select('rect');
 
                 seriesEnter.append('g')
                     .attr('class', 'nv-check-box')
@@ -172,7 +163,16 @@ nv.models.legend = function() {
 
             //TODO: implement fixed-width and max-width options (max-width is especially useful with the align option)
             // NEW ALIGNING CODE, TODO: clean up
-            var legendWidth = 0;
+
+            var versPadding;
+            switch(vers) {
+                case 'furious' :
+                    versPadding = 23;
+                    break;
+                case 'classic' :
+                    versPadding = 20;
+            }
+
             if (align) {
 
                 var seriesWidths = [];
@@ -192,8 +192,8 @@ nv.models.legend = function() {
                 });
 
                 var seriesPerRow = 0;
+                var legendWidth = 0;
                 var columnWidths = [];
-                legendWidth = 0;
 
                 while ( legendWidth < availableWidth && seriesPerRow < seriesWidths.length) {
                     columnWidths[seriesPerRow] = seriesWidths[seriesPerRow];
@@ -255,9 +255,6 @@ nv.models.legend = function() {
                         newxpos += length;
                         if (newxpos > maxwidth) maxwidth = newxpos;
 
-                        if(legendWidth < xpos + maxwidth) {
-                            legendWidth = xpos + maxwidth;
-                        }
                         return 'translate(' + xpos + ',' + ypos + ')';
                     });
 
@@ -275,58 +272,28 @@ nv.models.legend = function() {
                     })
                     .attr('height', 18)
                     .attr('y', -9)
-                    .attr('x', -15);
-
-                // The background for the expanded legend (UI)
-                gEnter.insert('rect',':first-child')
-                    .attr('class', 'nv-legend-bg')
-                    .attr('fill', '#eee')
-                    // .attr('stroke', '#444')
-                    .attr('opacity',0);
-
-                var seriesBG = g.select('.nv-legend-bg');
-
-                seriesBG
-                .transition().duration(300)
-                    .attr('x', -versPadding )
-                    .attr('width', legendWidth + versPadding - 12)
-                    .attr('height', height + 10)
-                    .attr('y', -margin.top - 10)
-                    .attr('opacity', expanded ? 1 : 0);
-
-
+                    .attr('x', -15)
             }
 
             seriesShape
                 .style('fill', setBGColor)
-                .style('fill-opacity', setBGOpacity)
-                .style('stroke', setBGColor);
+                .style('stroke', function(d,i) { return d.color || color(d, i) });
         });
 
         function setTextColor(d,i) {
             if(vers != 'furious') return '#000';
             if(expanded) {
-                return d.disengaged ? '#000' : '#fff';
+                return d.disengaged ? color(d,i) : '#fff';
             } else if (!expanded) {
-                if(!d.color) d.color = color(d,i);
-                return !!d.disabled ? d.color : '#fff';
+                return !!d.disabled ? color(d,i) : '#fff';
             }
         }
 
         function setBGColor(d,i) {
             if(expanded && vers == 'furious') {
-                return d.disengaged ? '#eee' : d.color || color(d,i);
+                return d.disengaged ? '#fff' : color(d,i);
             } else {
-                return d.color || color(d,i);
-            }
-        }
-
-
-        function setBGOpacity(d,i) {
-            if(expanded && vers == 'furious') {
-                return 1;
-            } else {
-                return !!d.disabled ? 0 : 1;
+                return !!d.disabled ? '#fff' : color(d,i);
             }
         }
 

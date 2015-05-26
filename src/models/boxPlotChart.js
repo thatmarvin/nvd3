@@ -1,15 +1,13 @@
-
-nv.models.discreteBarChart = function() {
+nv.models.boxPlotChart = function() {
     "use strict";
 
     //============================================================
     // Public Variables with Default Settings
     //------------------------------------------------------------
 
-    var discretebar = nv.models.discreteBar()
+    var boxplot = nv.models.boxPlot()
         , xAxis = nv.models.axis()
         , yAxis = nv.models.axis()
-        , tooltip = nv.models.tooltip()
         ;
 
     var margin = {top: 15, right: 10, bottom: 50, left: 60}
@@ -20,10 +18,11 @@ nv.models.discreteBarChart = function() {
         , showYAxis = true
         , rightAlignYAxis = false
         , staggerLabels = false
+        , tooltip = nv.models.tooltip()
         , x
         , y
-        , noData = null
-        , dispatch = d3.dispatch('beforeUpdate','renderEnd')
+        , noData = "No Data Available."
+        , dispatch = d3.dispatch('tooltipShow', 'tooltipHide', 'beforeUpdate', 'renderEnd')
         , duration = 250
         ;
 
@@ -36,16 +35,8 @@ nv.models.discreteBarChart = function() {
         .orient((rightAlignYAxis) ? 'right' : 'left')
         .tickFormat(d3.format(',.1f'))
     ;
-
-    tooltip
-        .duration(0)
-        .headerEnabled(false)
-        .valueFormatter(function(d, i) {
-            return yAxis.tickFormat()(d, i);
-        })
-        .keyFormatter(function(d, i) {
-            return xAxis.tickFormat()(d, i);
-        });
+    
+    tooltip.duration(0);
 
     //============================================================
     // Private Variables
@@ -55,7 +46,7 @@ nv.models.discreteBarChart = function() {
 
     function chart(selection) {
         renderWatch.reset();
-        renderWatch.models(discretebar);
+        renderWatch.models(boxplot);
         if (showXAxis) renderWatch.models(xAxis);
         if (showYAxis) renderWatch.models(yAxis);
 
@@ -63,8 +54,10 @@ nv.models.discreteBarChart = function() {
             var container = d3.select(this),
                 that = this;
             nv.utils.initSVG(container);
-            var availableWidth = nv.utils.availableWidth(width, container, margin),
-                availableHeight = nv.utils.availableHeight(height, container, margin);
+            var availableWidth = (width  || parseInt(container.style('width')) || 960)
+                    - margin.left - margin.right,
+                availableHeight = (height || parseInt(container.style('height')) || 400)
+                    - margin.top - margin.bottom;
 
             chart.update = function() {
                 dispatch.beforeUpdate();
@@ -72,21 +65,33 @@ nv.models.discreteBarChart = function() {
             };
             chart.container = this;
 
-            // Display No Data message if there's nothing to show.
-            if (!data || !data.length || !data.filter(function(d) { return d.values.length }).length) {
-                nv.utils.noData(chart, container);
+            // Display No Data message if there's nothing to show. (quartiles required at minimum)
+            if (!data || !data.length || 
+                    !data.filter(function(d) { return d.values.hasOwnProperty("Q1") && d.values.hasOwnProperty("Q2") && d.values.hasOwnProperty("Q3"); }).length) {
+                var noDataText = container.selectAll('.nv-noData').data([noData]);
+
+                noDataText.enter().append('text')
+                    .attr('class', 'nvd3 nv-noData')
+                    .attr('dy', '-.7em')
+                    .style('text-anchor', 'middle');
+
+                noDataText
+                    .attr('x', margin.left + availableWidth / 2)
+                    .attr('y', margin.top + availableHeight / 2)
+                    .text(function(d) { return d });
+
                 return chart;
             } else {
                 container.selectAll('.nv-noData').remove();
             }
 
             // Setup Scales
-            x = discretebar.xScale();
-            y = discretebar.yScale().clamp(true);
+            x = boxplot.xScale();
+            y = boxplot.yScale().clamp(true);
 
             // Setup containers and skeleton of chart
-            var wrap = container.selectAll('g.nv-wrap.nv-discreteBarWithAxes').data([data]);
-            var gEnter = wrap.enter().append('g').attr('class', 'nvd3 nv-wrap nv-discreteBarWithAxes').append('g');
+            var wrap = container.selectAll('g.nv-wrap.nv-boxPlotWithAxes').data([data]);
+            var gEnter = wrap.enter().append('g').attr('class', 'nvd3 nv-wrap nv-boxPlotWithAxes').append('g');
             var defsEnter = gEnter.append('defs');
             var g = wrap.select('g');
 
@@ -105,21 +110,21 @@ nv.models.discreteBarChart = function() {
             }
 
             // Main Chart Component(s)
-            discretebar
+            boxplot
                 .width(availableWidth)
                 .height(availableHeight);
 
             var barsWrap = g.select('.nv-barsWrap')
-                .datum(data.filter(function(d) { return !d.disabled }));
+                .datum(data.filter(function(d) { return !d.disabled }))
 
-            barsWrap.transition().call(discretebar);
+            barsWrap.transition().call(boxplot);
 
 
             defsEnter.append('clipPath')
-                .attr('id', 'nv-x-label-clip-' + discretebar.id())
+                .attr('id', 'nv-x-label-clip-' + boxplot.id())
                 .append('rect');
 
-            g.select('#nv-x-label-clip-' + discretebar.id() + ' rect')
+            g.select('#nv-x-label-clip-' + boxplot.id() + ' rect')
                 .attr('width', x.rangeBand() * (staggerLabels ? 2 : 1))
                 .attr('height', 16)
                 .attr('x', -x.rangeBand() / (staggerLabels ? 1 : 2 ));
@@ -128,11 +133,10 @@ nv.models.discreteBarChart = function() {
             if (showXAxis) {
                 xAxis
                     .scale(x)
-                    ._ticks( nv.utils.calcTicksX(availableWidth/100, data) )
+                    .ticks( nv.utils.calcTicksX(availableWidth/100, data) )
                     .tickSize(-availableHeight, 0);
 
-                g.select('.nv-x.nv-axis')
-                    .attr('transform', 'translate(0,' + (y.range()[0] + ((discretebar.showValues() && y.domain()[0] < 0) ? 16 : 0)) + ')');
+                g.select('.nv-x.nv-axis').attr('transform', 'translate(0,' + y.range()[0] + ')');
                 g.select('.nv-x.nv-axis').call(xAxis);
 
                 var xTicks = g.select('.nv-x.nv-axis').selectAll('g');
@@ -146,7 +150,7 @@ nv.models.discreteBarChart = function() {
             if (showYAxis) {
                 yAxis
                     .scale(y)
-                    ._ticks( nv.utils.calcTicksY(availableHeight/36, data) )
+                    .ticks( Math.floor(availableHeight/36) ) // can't use nv.utils.calcTicksY with Object data
                     .tickSize( -availableWidth, 0);
 
                 g.select('.nv-y.nv-axis').call(yAxis);
@@ -159,9 +163,13 @@ nv.models.discreteBarChart = function() {
                 .attr("y1", y(0))
                 .attr("y2", y(0))
             ;
+
+            //============================================================
+            // Event Handling/Dispatching (in chart's scope)
+            //------------------------------------------------------------
         });
 
-        renderWatch.renderEnd('discreteBar chart immediate');
+        renderWatch.renderEnd('nv-boxplot chart immediate');
         return chart;
     }
 
@@ -169,20 +177,15 @@ nv.models.discreteBarChart = function() {
     // Event Handling/Dispatching (out of chart's scope)
     //------------------------------------------------------------
 
-    discretebar.dispatch.on('elementMouseover.tooltip', function(evt) {
-        evt['series'] = {
-            key: chart.x()(evt.data),
-            value: chart.y()(evt.data),
-            color: evt.color
-        };
+    boxplot.dispatch.on('elementMouseover.tooltip', function(evt) {
         tooltip.data(evt).hidden(false);
     });
 
-    discretebar.dispatch.on('elementMouseout.tooltip', function(evt) {
-        tooltip.hidden(true);
+    boxplot.dispatch.on('elementMouseout.tooltip', function(evt) {
+        tooltip.data(evt).hidden(true);
     });
 
-    discretebar.dispatch.on('elementMousemove.tooltip', function(evt) {
+    boxplot.dispatch.on('elementMousemove.tooltip', function(evt) {
         tooltip.position({top: d3.event.pageY, left: d3.event.pageX})();
     });
 
@@ -191,7 +194,7 @@ nv.models.discreteBarChart = function() {
     //------------------------------------------------------------
 
     chart.dispatch = dispatch;
-    chart.discretebar = discretebar;
+    chart.boxplot = boxplot;
     chart.xAxis = xAxis;
     chart.yAxis = yAxis;
     chart.tooltip = tooltip;
@@ -205,19 +208,9 @@ nv.models.discreteBarChart = function() {
         staggerLabels: {get: function(){return staggerLabels;}, set: function(_){staggerLabels=_;}},
         showXAxis: {get: function(){return showXAxis;}, set: function(_){showXAxis=_;}},
         showYAxis: {get: function(){return showYAxis;}, set: function(_){showYAxis=_;}},
+        tooltips:    {get: function(){return tooltips;}, set: function(_){tooltips=_;}},
+        tooltipContent:    {get: function(){return tooltip;}, set: function(_){tooltip=_;}},
         noData:    {get: function(){return noData;}, set: function(_){noData=_;}},
-
-        // deprecated options
-        tooltips:    {get: function(){return tooltip.enabled();}, set: function(_){
-            // deprecated after 1.7.1
-            nv.deprecated('tooltips', 'use chart.tooltip.enabled() instead');
-            tooltip.enabled(!!_);
-        }},
-        tooltipContent:    {get: function(){return tooltip.contentGenerator();}, set: function(_){
-            // deprecated after 1.7.1
-            nv.deprecated('tooltipContent', 'use chart.tooltip.contentGenerator() instead');
-            tooltip.contentGenerator(_);
-        }},
 
         // options that require extra logic in the setter
         margin: {get: function(){return margin;}, set: function(_){
@@ -229,13 +222,13 @@ nv.models.discreteBarChart = function() {
         duration: {get: function(){return duration;}, set: function(_){
             duration = _;
             renderWatch.reset(duration);
-            discretebar.duration(duration);
+            boxplot.duration(duration);
             xAxis.duration(duration);
             yAxis.duration(duration);
         }},
         color:  {get: function(){return color;}, set: function(_){
             color = nv.utils.getColor(_);
-            discretebar.color(color);
+            boxplot.color(color);
         }},
         rightAlignYAxis: {get: function(){return rightAlignYAxis;}, set: function(_){
             rightAlignYAxis = _;
@@ -243,7 +236,7 @@ nv.models.discreteBarChart = function() {
         }}
     });
 
-    nv.utils.inheritOptions(chart, discretebar);
+    nv.utils.inheritOptions(chart, boxplot);
     nv.utils.initOptions(chart);
 
     return chart;

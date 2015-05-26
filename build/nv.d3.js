@@ -1,4 +1,4 @@
-/* nvd3 version 1.8.1 (https://github.com/novus/nvd3) 2015-04-28 */
+/* nvd3 version 1.8.1 (https://github.com/novus/nvd3) 2015-05-26 */
 (function(){
 
 // set up main nv object
@@ -10,7 +10,6 @@ nv.tooltip = nv.tooltip || {}; // For the tooltip system
 nv.utils = nv.utils || {}; // Utility subsystem
 nv.models = nv.models || {}; //stores all the possible models/components
 nv.charts = {}; //stores all the ready to use charts
-nv.graphs = []; //stores all the graphs currently on the page
 nv.logs = {}; //stores some statistics and potential error messages
 nv.dom = {}; //DOM manipulation functions
 
@@ -94,7 +93,6 @@ nv.render = function render(step) {
         for (var i = 0; i < step && (graph = nv.render.queue[i]); i++) {
             chart = graph.generate();
             if (typeof graph.callback == typeof(Function)) graph.callback(chart);
-            nv.graphs.push(chart);
         }
 
         nv.render.queue.splice(0, i);
@@ -187,7 +185,7 @@ nv.interactiveGuideline = function() {
     "use strict";
 
     var tooltip = nv.models.tooltip();
-    tooltip.duration(0).hideDelay(0).hidden(false);
+    tooltip.duration(0).hideDelay(0)._isInteractiveLayer(true).hidden(false);
 
     //Public settings
     var width = null;
@@ -318,6 +316,7 @@ nv.interactiveGuideline = function() {
             }
 
             svgContainer
+                .on("touchmove",mouseHandler)
                 .on("mousemove",mouseHandler, true)
                 .on("mouseout" ,mouseHandler,true)
                 .on("dblclick" ,mouseHandler)
@@ -464,7 +463,7 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
     var yDistMax = Infinity, indexToHighlight = null;
     values.forEach(function(d,i) {
         var delta = Math.abs(searchVal - d);
-        if ( delta <= yDistMax && delta < threshold) {
+        if ( d != null && delta <= yDistMax && delta < threshold) {
             yDistMax = delta;
             indexToHighlight = i;
         }
@@ -512,11 +511,17 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
             ,   hideDelay = 400  // delay before the tooltip hides after calling hide()
             ,   tooltip = null // d3 select of tooltipElem below
             ,   tooltipElem = null  //actual DOM element representing the tooltip.
-            ,   position = {left: null, top: null}      //Relative position of the tooltip inside chartContainer.
+            ,   position = {left: null, top: null}   //Relative position of the tooltip inside chartContainer.
+            ,   offset = {left: 0, top: 0}   //Offset of tooltip against the pointer
             ,   enabled = true  //True -> tooltips are rendered. False -> don't render tooltips.
             ,   duration = 100 // duration for tooltip movement
             ,   headerEnabled = true
         ;
+
+        // set to true by interactive layer to adjust tooltip positions
+        // eventually we should probably fix interactive layer to get the position better.
+        // for now this is needed if you want to set chartContainer for normal tooltips, else it "fixes" it to broken
+        var isInteractiveLayer = false;
 
         //Generates a unique id when you create a new tooltip() object
         var id = "nvtooltip-" + Math.floor(Math.random() * 100000);
@@ -531,6 +536,10 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
 
         //Format function for the tooltip header value.
         var headerFormatter = function(d) {
+            return d;
+        };
+
+        var keyFormatter = function(d, i) {
             return d;
         };
 
@@ -572,11 +581,11 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
 
             trowEnter.append("td")
                 .classed("key",true)
-                .html(function(p) {return p.key});
+                .html(function(p, i) {return keyFormatter(p.key, i)});
 
             trowEnter.append("td")
                 .classed("value",true)
-                .html(function(p,i) { return valueFormatter(p.value,i) });
+                .html(function(p, i) { return valueFormatter(p.value, i) });
 
 
             trowEnter.selectAll("td").each(function(p) {
@@ -696,6 +705,10 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
                         tTop = tooltipTop(tooltipElem);
                         break;
                 }
+                
+                // adjust tooltip offsets
+                left -= offset.left;
+                top -= offset.top;
 
                 // using tooltip.style('transform') returns values un-usable for tween
                 var box = tooltipElem.getBoundingClientRect();
@@ -727,7 +740,10 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
                         // using tween since some versions of d3 can't auto-tween a translate on a div
                         .styleTween(prefix + 'transform', function (d) {
                             return translateInterpolator;
-                        })
+                        }, 'important')
+                        // Safari has its own `-webkit-transform` and does not support `transform` 
+                        // transform tooltip without transition only in Safari
+                        .style('-webkit-transform', new_translate)
                         .style('opacity', 1);
                 }
 
@@ -795,7 +811,7 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
                     tooltipElem.innerHTML = newContent;
                 }
 
-                if (chartContainer) {
+                if (chartContainer && isInteractiveLayer) {
                     nv.dom.read(function() {
                         var svgComp = chartContainer.getElementsByTagName("svg")[0];
                         var svgOffset = {left:0,top:0};
@@ -850,12 +866,20 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
             contentGenerator: {get: function(){return contentGenerator;}, set: function(_){contentGenerator=_;}},
             valueFormatter: {get: function(){return valueFormatter;}, set: function(_){valueFormatter=_;}},
             headerFormatter: {get: function(){return headerFormatter;}, set: function(_){headerFormatter=_;}},
+            keyFormatter: {get: function(){return keyFormatter;}, set: function(_){keyFormatter=_;}},
             headerEnabled:   {get: function(){return headerEnabled;}, set: function(_){headerEnabled=_;}},
+
+            // internal use only, set by interactive layer to adjust position.
+            _isInteractiveLayer: {get: function(){return isInteractiveLayer;}, set: function(_){isInteractiveLayer=!!_;}},
 
             // options with extra logic
             position: {get: function(){return position;}, set: function(_){
                 position.left = _.left !== undefined ? _.left : position.left;
                 position.top  = _.top  !== undefined ? _.top  : position.top;
+            }},
+            offset: {get: function(){return offset;}, set: function(_){
+                offset.left = _.left !== undefined ? _.left : offset.left;
+                offset.top  = _.top  !== undefined ? _.top  : offset.top;
             }},
             hidden: {get: function(){return hidden;}, set: function(_){
                 if (hidden != _) {
@@ -1280,7 +1304,6 @@ To enable in the chart:
 chart.options = nv.utils.optionsFunc.bind(chart);
 */
 nv.utils.optionsFunc = function(args) {
-    nv.deprecated('nv.utils.optionsFunc');
     if (args) {
         d3.map(args).forEach((function(key,value) {
             if (typeof this[key] === "function") {
@@ -1344,9 +1367,19 @@ nv.utils.initOption = function(chart, name) {
     } else {
         chart[name] = function (_) {
             if (!arguments.length) return chart._options[name];
+            chart._overrides[name] = true;
             chart._options[name] = _;
             return chart;
         };
+        // calling the option as _option will ignore if set by option already
+        // so nvd3 can set options internally but the stop if set manually
+        chart['_' + name] = function(_) {
+            if (!arguments.length) return chart._options[name];
+            if (!chart._overrides[name]) {
+                chart._options[name] = _;
+            }
+            return chart;
+        }
     }
 };
 
@@ -1355,6 +1388,7 @@ nv.utils.initOption = function(chart, name) {
 Add all options in an options object to the chart
 */
 nv.utils.initOptions = function(chart) {
+    chart._overrides = chart._overrides || {};
     var ops = Object.getOwnPropertyNames(chart._options || {});
     var calls = Object.getOwnPropertyNames(chart._calls || {});
     ops = ops.concat(calls);
@@ -1458,7 +1492,7 @@ nv.utils.initSVG = function(svg) {
 Sanitize and provide default for the container height.
 */
 nv.utils.sanitizeHeight = function(height, container) {
-    return (height || parseInt(container.style('height')) || 400);
+    return (height || parseInt(container.style('height'), 10) || 400);
 };
 
 
@@ -1466,7 +1500,7 @@ nv.utils.sanitizeHeight = function(height, container) {
 Sanitize and provide default for the container width.
 */
 nv.utils.sanitizeWidth = function(width, container) {
-    return (width || parseInt(container.style('width')) || 960);
+    return (width || parseInt(container.style('width'), 10) || 960);
 };
 
 
@@ -1601,7 +1635,9 @@ nv.models.axis = function() {
                     if (showMaxMin) {
                         axisMaxMin = wrap.selectAll('g.nv-axisMaxMin')
                             .data(scale.domain());
-                        axisMaxMin.enter().append('g').attr('class', 'nv-axisMaxMin').append('text');
+                        axisMaxMin.enter().append('g').attr('class',function(d,i){
+                                return ['nv-axisMaxMin','nv-axisMaxMin-x',(i == 0 ? 'nv-axisMin-x':'nv-axisMax-x')].join(' ')
+                        }).append('text');
                         axisMaxMin.exit().remove();
                         axisMaxMin
                             .attr('transform', function(d,i) {
@@ -1661,7 +1697,9 @@ nv.models.axis = function() {
                         axisMaxMin = wrap.selectAll('g.nv-axisMaxMin')
                             //.data(scale.domain())
                             .data([scale.domain()[0], scale.domain()[scale.domain().length - 1]]);
-                        axisMaxMin.enter().append('g').attr('class', 'nv-axisMaxMin').append('text');
+                        axisMaxMin.enter().append('g').attr('class',function(d,i){
+                                return ['nv-axisMaxMin','nv-axisMaxMin-x',(i == 0 ? 'nv-axisMin-x':'nv-axisMax-x')].join(' ')
+                        }).append('text');
                         axisMaxMin.exit().remove();
                         axisMaxMin
                             .attr('transform', function(d,i) {
@@ -1698,7 +1736,9 @@ nv.models.axis = function() {
                     if (showMaxMin) {
                         axisMaxMin = wrap.selectAll('g.nv-axisMaxMin')
                             .data(scale.domain());
-                        axisMaxMin.enter().append('g').attr('class', 'nv-axisMaxMin').append('text')
+                       	axisMaxMin.enter().append('g').attr('class',function(d,i){
+                                return ['nv-axisMaxMin','nv-axisMaxMin-y',(i == 0 ? 'nv-axisMin-y':'nv-axisMax-y')].join(' ')
+                        }).append('text')
                             .style('opacity', 0);
                         axisMaxMin.exit().remove();
                         axisMaxMin
@@ -1740,7 +1780,9 @@ nv.models.axis = function() {
                     if (showMaxMin) {
                         axisMaxMin = wrap.selectAll('g.nv-axisMaxMin')
                             .data(scale.domain());
-                        axisMaxMin.enter().append('g').attr('class', 'nv-axisMaxMin').append('text')
+                        axisMaxMin.enter().append('g').attr('class',function(d,i){
+                                return ['nv-axisMaxMin','nv-axisMaxMin-y',(i == 0 ? 'nv-axisMin-y':'nv-axisMax-y')].join(' ')
+                        }).append('text')
                             .style('opacity', 0);
                         axisMaxMin.exit().remove();
                         axisMaxMin
@@ -1895,6 +1937,7 @@ nv.models.scatter = function() {
         , height       = null
         , color        = nv.utils.defaultColor() // chooses color
         , id           = Math.floor(Math.random() * 100000) //Create semi-unique ID incase user doesn't select one
+        , container    = null
         , x            = d3.scale.linear()
         , y            = d3.scale.linear()
         , z            = d3.scale.linear() //linear because d3.svg.shape.size is treated as area
@@ -1940,7 +1983,7 @@ nv.models.scatter = function() {
     function chart(selection) {
         renderWatch.reset();
         selection.each(function(data) {
-            var container = d3.select(this);
+            container = d3.select(this);
             var availableWidth = nv.utils.availableWidth(width, container, margin),
                 availableHeight = nv.utils.availableHeight(height, container, margin);
 
@@ -2013,6 +2056,7 @@ nv.models.scatter = function() {
             wrap.classed('nv-single-point', singlePoint);
             gEnter.append('g').attr('class', 'nv-groups');
             gEnter.append('g').attr('class', 'nv-point-paths');
+            wrapEnter.append('g').attr('class', 'nv-point-clips');
 
             wrap.attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
@@ -2027,33 +2071,34 @@ nv.models.scatter = function() {
             g.attr('clip-path', clipEdge ? 'url(#nv-edge-clip-' + id + ')' : '');
 
             function updateInteractiveLayer() {
+                // Always clear needs-update flag regardless of whether or not
+                // we will actually do anything (avoids needless invocations).
                 needsUpdate = false;
 
                 if (!interactive) return false;
 
-                var vertices = d3.merge(data.map(function(group, groupIndex) {
-                        return group.values
-                            .map(function(point, pointIndex) {
-                                // *Adding noise to make duplicates very unlikely
-                                // *Injecting series and point index for reference
-                                /* *Adding a 'jitter' to the points, because there's an issue in d3.geom.voronoi.
-                                 */
-                                var pX = getX(point,pointIndex);
-                                var pY = getY(point,pointIndex);
-
-                                return [x(pX)+ Math.random() * 1e-7,
-                                        y(pY)+ Math.random() * 1e-7,
-                                    groupIndex,
-                                    pointIndex, point]; //temp hack to add noise until I think of a better way so there are no duplicates
-                            })
-                            .filter(function(pointArray, pointIndex) {
-                                return pointActive(pointArray[4], pointIndex); // Issue #237.. move filter to after map, so pointIndex is correct!
-                            })
-                    })
-                );
-
                 // inject series and point index for reference into voronoi
                 if (useVoronoi === true) {
+                    var vertices = d3.merge(data.map(function(group, groupIndex) {
+                            return group.values
+                                .map(function(point, pointIndex) {
+                                    // *Adding noise to make duplicates very unlikely
+                                    // *Injecting series and point index for reference
+                                    /* *Adding a 'jitter' to the points, because there's an issue in d3.geom.voronoi.
+                                     */
+                                    var pX = getX(point,pointIndex);
+                                    var pY = getY(point,pointIndex);
+
+                                    return [x(pX)+ Math.random() * 1e-4,
+                                            y(pY)+ Math.random() * 1e-4,
+                                        groupIndex,
+                                        pointIndex, point]; //temp hack to add noise until I think of a better way so there are no duplicates
+                                })
+                                .filter(function(pointArray, pointIndex) {
+                                    return pointActive(pointArray[4], pointIndex); // Issue #237.. move filter to after map, so pointIndex is correct!
+                                })
+                        })
+                    );
 
                     if (vertices.length == 0) return false;  // No active points, we're done
                     if (vertices.length < 3) {
@@ -2108,9 +2153,8 @@ nv.models.scatter = function() {
                     if (clipVoronoi) {
                         // voronoi sections are already set to clip,
                         // just create the circles with the IDs they expect
-                        wrap.select('#nv-point-clips').remove();
-                        var clips = wrap.append("svg:g").attr("id", "nv-point-clips");
-                        clips.selectAll("clipPath")
+                        wrap.select('.nv-point-clips').selectAll('clipPath').remove();
+                        wrap.select('.nv-point-clips').selectAll("clipPath")
                             .data(vertices)
                             .enter().append("svg:clipPath")
                             .attr("id", function(d, i) { return "nv-clip-"+i;})
@@ -2126,6 +2170,10 @@ nv.models.scatter = function() {
                         if (series === undefined) return;
                         var point  = series.values[d.point];
                         point['color'] = color(series, d.series);
+
+                        // standardize attributes for tooltip.
+                        point['x'] = getX(point);
+                        point['y'] = getY(point);
 
                         // can't just get box of event node since it's actually a voronoi polygon
                         var box = container.node().getBoundingClientRect();
@@ -2161,17 +2209,6 @@ nv.models.scatter = function() {
                         });
 
                 } else {
-                    /*
-                     // bring data in form needed for click handlers
-                     var dataWithPoints = vertices.map(function(d, i) {
-                     return {
-                     'data': d,
-                     'series': vertices[i][2],
-                     'point': vertices[i][3]
-                     }
-                     });
-                     */
-
                     // add event handlers to points instead voronoi paths
                     wrap.select('.nv-groups').selectAll('.nv-group')
                         .selectAll('.nv-point')
@@ -2326,14 +2363,14 @@ nv.models.scatter = function() {
     chart._calls = new function() {
         this.clearHighlights = function () {
             nv.dom.write(function() {
-                d3.selectAll(".nv-chart-" + id + " .nv-point.hover").classed("hover", false);
+                container.selectAll(".nv-point.hover").classed("hover", false);
             });
             return null;
         };
         this.highlightPoint = function (seriesIndex, pointIndex, isHoverOver) {
             nv.dom.write(function() {
-                var node = document.querySelector(".nv-chart-" + id + " .nv-series-" + seriesIndex + " .nv-point-" + pointIndex);
-                d3.select(node).classed("hover", isHoverOver);
+                container.select(" .nv-series-" + seriesIndex + " .nv-point-" + pointIndex)
+                    .classed("hover", isHoverOver);
             });
         };
     };
@@ -2418,6 +2455,7 @@ nv.models.line = function() {
     var margin = {top: 0, right: 0, bottom: 0, left: 0}
         , width = 960
         , height = 500
+        , container = null
         , strokeWidth = 1.5
         , color = nv.utils.defaultColor() // a function that returns a color
         , getX = function(d) { return d.x } // accessor to get the x value from a data point
@@ -2455,9 +2493,9 @@ nv.models.line = function() {
         renderWatch.reset();
         renderWatch.models(scatter);
         selection.each(function(data) {
-            var availableWidth = width - margin.left - margin.right,
-                availableHeight = height - margin.top - margin.bottom,
-                container = d3.select(this);
+            container = d3.select(this);
+            var availableWidth = nv.utils.availableWidth(width, container, margin),
+                availableHeight = nv.utils.availableHeight(height, container, margin);
             nv.utils.initSVG(container);
 
             // Setup Scales
@@ -2644,13 +2682,15 @@ nv.models.legend = function() {
         , width = 400
         , height = 20
         , getKey = function(d) { return d.key }
-        , color = nv.utils.defaultColor()
+        , color = nv.utils.getColor()
         , align = true
-        , padding = 28 //define how much space between legend items.
+        , padding = 32 //define how much space between legend items. - recommend 32 for furious version
         , rightAlign = true
         , updateState = true   //If true, legend will update data.disabled and trigger a 'stateChange' dispatch.
         , radioButtonMode = false   //If true, clicking legend items will cause it to behave like a radio button. (only one can be selected at a time)
+        , expanded = false
         , dispatch = d3.dispatch('legendClick', 'legendDblclick', 'legendMouseover', 'legendMouseout', 'stateChange')
+        , vers = 'classic' //Options are "classic" and "furious"
         ;
 
     function chart(selection) {
@@ -2667,20 +2707,62 @@ nv.models.legend = function() {
             wrap.attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
             var series = g.selectAll('.nv-series')
-                .data(function(d) { 
-                    return d; 
+                .data(function(d) {
+                    if(vers != 'furious') return d;
+
+                    return d.filter(function(n) {
+                        return expanded ? true : !n.disengaged;
+                    });
                 });
-            var seriesEnter = series.enter().append('g').attr('class', 'nv-series')
-                
-            seriesEnter.append('circle')
-                .style('stroke-width', 2)
-                .attr('class','nv-legend-symbol')
-                .attr('r', 5);
+
+            var seriesEnter = series.enter().append('g').attr('class', 'nv-series');
+            var seriesShape;
+
+            var versPadding;
+            switch(vers) {
+                case 'furious' :
+                    versPadding = 23;
+                    break;
+                case 'classic' :
+                    versPadding = 20;
+            }
+
+            if(vers == 'classic') {
+                seriesEnter.append('circle')
+                    .style('stroke-width', 2)
+                    .attr('class','nv-legend-symbol')
+                    .attr('r', 5);
+
+                seriesShape = series.select('circle');
+            } else if (vers == 'furious') {
+                seriesEnter.append('rect')
+                    .style('stroke-width', 2)
+                    .attr('class','nv-legend-symbol')
+                    .attr('rx', 3)
+                    .attr('ry', 3);
+
+                seriesShape = series.select('.nv-legend-symbol');
+
+                seriesEnter.append('g')
+                    .attr('class', 'nv-check-box')
+                    .property('innerHTML','<path d="M0.5,5 L22.5,5 L22.5,26.5 L0.5,26.5 L0.5,5 Z" class="nv-box"></path><path d="M5.5,12.8618467 L11.9185089,19.2803556 L31,0.198864511" class="nv-check"></path>')
+                    .attr('transform', 'translate(-10,-8)scale(0.5)');
+
+                var seriesCheckbox = series.select('.nv-check-box');
+
+                seriesCheckbox.each(function(d,i) {
+                    d3.select(this).selectAll('path')
+                        .attr('stroke', setTextColor(d,i));
+                });
+            }
+
             seriesEnter.append('text')
                 .attr('text-anchor', 'start')
                 .attr('class','nv-legend-text')
                 .attr('dy', '.32em')
                 .attr('dx', '8');
+
+            var seriesText = series.select('text.nv-legend-text');
 
             series
                 .on('mouseover', function(d,i) {
@@ -2694,26 +2776,48 @@ nv.models.legend = function() {
                     // make sure we re-get data in case it was modified
                     var data = series.data();
                     if (updateState) {
-                        if (radioButtonMode) {
-                            //Radio button mode: set every series to disabled,
-                            //  and enable the clicked series.
-                            data.forEach(function(series) { series.disabled = true});
-                            d.disabled = false;
-                        }
-                        else {
-                            d.disabled = !d.disabled;
-                            if (data.every(function(series) { return series.disabled})) {
-                                //the default behavior of NVD3 legends is, if every single series
-                                // is disabled, turn all series' back on.
-                                data.forEach(function(series) { series.disabled = false});
+                        if(vers =='classic') {
+                            if (radioButtonMode) {
+                                //Radio button mode: set every series to disabled,
+                                //  and enable the clicked series.
+                                data.forEach(function(series) { series.disabled = true});
+                                d.disabled = false;
+                            }
+                            else {
+                                d.disabled = !d.disabled;
+                                if (data.every(function(series) { return series.disabled})) {
+                                    //the default behavior of NVD3 legends is, if every single series
+                                    // is disabled, turn all series' back on.
+                                    data.forEach(function(series) { series.disabled = false});
+                                }
+                            }
+                        } else if(vers == 'furious') {
+                            if(expanded) {
+                                d.disengaged = !d.disengaged;
+                                d.userDisabled = d.userDisabled == undefined ? !!d.disabled : d.userDisabled;
+                                d.disabled = d.disengaged || d.userDisabled;
+                            } else if (!expanded) {
+                                d.disabled = !d.disabled;
+                                d.userDisabled = d.disabled;
+                                var engaged = data.filter(function(d) { return !d.disengaged; });
+                                if (engaged.every(function(series) { return series.userDisabled })) {
+                                    //the default behavior of NVD3 legends is, if every single series
+                                    // is disabled, turn all series' back on.
+                                    data.forEach(function(series) {
+                                        series.disabled = series.userDisabled = false;
+                                    });
+                                }
                             }
                         }
                         dispatch.stateChange({
-                            disabled: data.map(function(d) { return !!d.disabled })
+                            disabled: data.map(function(d) { return !!d.disabled }),
+                            disengaged: data.map(function(d) { return !!d.disengaged })
                         });
+
                     }
                 })
                 .on('dblclick', function(d,i) {
+                    if(vers == 'furious' && expanded) return;
                     dispatch.legendDblclick(d,i);
                     if (updateState) {
                         // make sure we re-get data in case it was modified
@@ -2722,23 +2826,26 @@ nv.models.legend = function() {
                         // is to set all other series' to false, and make the double clicked series enabled.
                         data.forEach(function(series) {
                             series.disabled = true;
+                            if(vers == 'furious') series.userDisabled = series.disabled;
                         });
                         d.disabled = false;
+                        if(vers == 'furious') d.userDisabled = d.disabled;
                         dispatch.stateChange({
                             disabled: data.map(function(d) { return !!d.disabled })
                         });
                     }
                 });
 
-            series.classed('nv-disabled', function(d) { return d.disabled });
+            series.classed('nv-disabled', function(d) { return d.userDisabled });
             series.exit().remove();
-            series.select('circle')
-                .style('fill', function(d,i) { return d.color || color(d,i)})
-                .style('stroke', function(d,i) { return d.color || color(d, i) });
-            series.select('text').text(getKey);
+
+            seriesText
+                .attr('fill', setTextColor)
+                .text(getKey);
 
             //TODO: implement fixed-width and max-width options (max-width is especially useful with the align option)
             // NEW ALIGNING CODE, TODO: clean up
+            var legendWidth = 0;
             if (align) {
 
                 var seriesWidths = [];
@@ -2758,8 +2865,8 @@ nv.models.legend = function() {
                 });
 
                 var seriesPerRow = 0;
-                var legendWidth = 0;
                 var columnWidths = [];
+                legendWidth = 0;
 
                 while ( legendWidth < availableWidth && seriesPerRow < seriesWidths.length) {
                     columnWidths[seriesPerRow] = seriesWidths[seriesPerRow];
@@ -2789,7 +2896,7 @@ nv.models.legend = function() {
 
                 series
                     .attr('transform', function(d, i) {
-                        return 'translate(' + xPositions[i % seriesPerRow] + ',' + (5 + Math.floor(i / seriesPerRow) * 20) + ')';
+                        return 'translate(' + xPositions[i % seriesPerRow] + ',' + (5 + Math.floor(i / seriesPerRow) * versPadding) + ')';
                     });
 
                 //position legend as far right as possible within the total width
@@ -2800,7 +2907,7 @@ nv.models.legend = function() {
                     g.attr('transform', 'translate(0' + ',' + margin.top + ')');
                 }
 
-                height = margin.top + margin.bottom + (Math.ceil(seriesWidths.length / seriesPerRow) * 20);
+                height = margin.top + margin.bottom + (Math.ceil(seriesWidths.length / seriesPerRow) * versPadding);
 
             } else {
 
@@ -2815,12 +2922,15 @@ nv.models.legend = function() {
 
                         if (width < margin.left + margin.right + xpos + length) {
                             newxpos = xpos = 5;
-                            ypos += 20;
+                            ypos += versPadding;
                         }
 
                         newxpos += length;
                         if (newxpos > maxwidth) maxwidth = newxpos;
 
+                        if(legendWidth < xpos + maxwidth) {
+                            legendWidth = xpos + maxwidth;
+                        }
                         return 'translate(' + xpos + ',' + ypos + ')';
                     });
 
@@ -2829,7 +2939,69 @@ nv.models.legend = function() {
 
                 height = margin.top + margin.bottom + ypos + 15;
             }
+
+            if(vers == 'furious') {
+                // Size rectangles after text is placed
+                seriesShape
+                    .attr('width', function(d,i) {
+                        return seriesText[0][i].getComputedTextLength() + 27;
+                    })
+                    .attr('height', 18)
+                    .attr('y', -9)
+                    .attr('x', -15);
+
+                // The background for the expanded legend (UI)
+                gEnter.insert('rect',':first-child')
+                    .attr('class', 'nv-legend-bg')
+                    .attr('fill', '#eee')
+                    // .attr('stroke', '#444')
+                    .attr('opacity',0);
+
+                var seriesBG = g.select('.nv-legend-bg');
+
+                seriesBG
+                .transition().duration(300)
+                    .attr('x', -versPadding )
+                    .attr('width', legendWidth + versPadding - 12)
+                    .attr('height', height + 10)
+                    .attr('y', -margin.top - 10)
+                    .attr('opacity', expanded ? 1 : 0);
+
+
+            }
+
+            seriesShape
+                .style('fill', setBGColor)
+                .style('fill-opacity', setBGOpacity)
+                .style('stroke', setBGColor);
         });
+
+        function setTextColor(d,i) {
+            if(vers != 'furious') return '#000';
+            if(expanded) {
+                return d.disengaged ? '#000' : '#fff';
+            } else if (!expanded) {
+                if(!d.color) d.color = color(d,i);
+                return !!d.disabled ? d.color : '#fff';
+            }
+        }
+
+        function setBGColor(d,i) {
+            if(expanded && vers == 'furious') {
+                return d.disengaged ? '#eee' : d.color || color(d,i);
+            } else {
+                return d.color || color(d,i);
+            }
+        }
+
+
+        function setBGOpacity(d,i) {
+            if(expanded && vers == 'furious') {
+                return 1;
+            } else {
+                return !!d.disabled ? 0 : 1;
+            }
+        }
 
         return chart;
     }
@@ -2845,12 +3017,14 @@ nv.models.legend = function() {
         // simple options, just get/set the necessary values
         width:      {get: function(){return width;}, set: function(_){width=_;}},
         height:     {get: function(){return height;}, set: function(_){height=_;}},
-        key: {get: function(){return getKey;}, set: function(_){getKey=_;}},
+        key:        {get: function(){return getKey;}, set: function(_){getKey=_;}},
         align:      {get: function(){return align;}, set: function(_){align=_;}},
         rightAlign:    {get: function(){return rightAlign;}, set: function(_){rightAlign=_;}},
         padding:       {get: function(){return padding;}, set: function(_){padding=_;}},
-        updateState:    {get: function(){return updateState;}, set: function(_){updateState=_;}},
+        updateState:   {get: function(){return updateState;}, set: function(_){updateState=_;}},
         radioButtonMode:    {get: function(){return radioButtonMode;}, set: function(_){radioButtonMode=_;}},
+        expanded:   {get: function(){return expanded;}, set: function(_){expanded=_;}},
+        vers:   {get: function(){return vers;}, set: function(_){vers=_;}},
 
         // options that require extra logic in the setter
         margin: {get: function(){return margin;}, set: function(_){
@@ -3055,7 +3229,7 @@ nv.models.lineChart = function() {
             if (showXAxis) {
                 xAxis
                     .scale(x)
-                    .ticks(xAxis.ticks() ? xAxis.ticks() : nv.utils.calcTicksX(availableWidth/100, data) )
+                    ._ticks(nv.utils.calcTicksX(availableWidth/100, data) )
                     .tickSize(-availableHeight, 0);
 
                 g.select('.nv-x.nv-axis')
@@ -3067,7 +3241,7 @@ nv.models.lineChart = function() {
             if (showYAxis) {
                 yAxis
                     .scale(y)
-                    .ticks(yAxis.ticks() ? yAxis.ticks() : nv.utils.calcTicksY(availableHeight/36, data) )
+                    ._ticks(nv.utils.calcTicksY(availableHeight/36, data) )
                     .tickSize( -availableWidth, 0);
 
                 g.select('.nv-y.nv-axis')
@@ -3095,14 +3269,17 @@ nv.models.lineChart = function() {
                     })
                     .forEach(function(series,i) {
                         pointIndex = nv.interactiveBisect(series.values, e.pointXValue, chart.x());
-                        lines.highlightPoint(i, pointIndex, true);
                         var point = series.values[pointIndex];
+                        var pointYValue = chart.y()(point, pointIndex);
+                        if (pointYValue != null) {
+                            lines.highlightPoint(i, pointIndex, true);
+                        }
                         if (point === undefined) return;
                         if (singlePoint === undefined) singlePoint = point;
                         if (pointXLocation === undefined) pointXLocation = chart.xScale()(chart.x()(point,pointIndex));
                         allData.push({
                             key: series.key,
-                            value: chart.y()(point, pointIndex),
+                            value: pointYValue,
                             color: color(series, series.seriesIndex),
                             custom: series.custom || {}
                         });
@@ -3122,10 +3299,11 @@ nv.models.lineChart = function() {
                     .position({left: e.mouseX + margin.left, top: e.mouseY + margin.top})
                     .chartContainer(that.parentNode)
                     .valueFormatter(function(d,i) {
-                        return yAxis.tickFormat()(d);
+                        return d == null ? "N/A" : yAxis.tickFormat()(d);
                     })
                     .data({
                         value: xValue,
+                        index: pointIndex,
                         series: allData
                     })();
 
