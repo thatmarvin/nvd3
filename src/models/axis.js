@@ -72,13 +72,14 @@ nv.models.axis = function() {
             switch (axis.orient()) {
                 case 'top':
                     axisLabel.enter().append('text').attr('class', 'nv-axislabel');
-                    if (scale.range().length < 2) {
-                        w = 0;
-                    } else if (scale.range().length === 2) {
-                        w = scale.range()[1];
-                    } else {
-                        w = scale.range()[scale.range().length-1]+(scale.range()[1]-scale.range()[0]);
-                    }
+                  w = 0;
+                  if (scale.range().length === 1) {
+                    w = isOrdinal ? scale.range()[0] * 2 + scale.rangeBand() : 0;
+                  } else if (scale.range().length === 2) {
+                    w = isOrdinal ? scale.range()[0] + scale.range()[1] + scale.rangeBand() : scale.range()[1];
+                  } else if ( scale.range().length > 2){
+                    w = scale.range()[scale.range().length-1]+(scale.range()[1]-scale.range()[0]);
+                  };
                     axisLabel
                         .attr('text-anchor', 'middle')
                         .attr('y', 0)
@@ -130,15 +131,25 @@ nv.models.axis = function() {
                         xTicks
                             .attr('transform', rotateLabelsRule)
                             .style('text-anchor', rotateLabels%360 > 0 ? 'start' : 'end');
+                    } else {
+                        if (staggerLabels) {
+                            xTicks
+                                .attr('transform', function(d,i) {
+                                    return 'translate(0,' + (i % 2 == 0 ? '0' : '12') + ')'
+                                });
+                        } else {
+                            xTicks.attr('transform', "translate(0,0)");
+                        }
                     }
                     axisLabel.enter().append('text').attr('class', 'nv-axislabel');
-                    if (scale.range().length < 2) {
-                        w = 0;
+                    w = 0;
+                    if (scale.range().length === 1) {
+                        w = isOrdinal ? scale.range()[0] * 2 + scale.rangeBand() : 0;
                     } else if (scale.range().length === 2) {
-                        w = scale.range()[1];
-                    } else {
+                        w = isOrdinal ? scale.range()[0] + scale.range()[1] + scale.rangeBand() : scale.range()[1];
+                    } else if ( scale.range().length > 2){
                         w = scale.range()[scale.range().length-1]+(scale.range()[1]-scale.range()[0]);
-                    }
+                    };
                     axisLabel
                         .attr('text-anchor', 'middle')
                         .attr('y', xLabelMargin)
@@ -170,11 +181,6 @@ nv.models.axis = function() {
                                 return 'translate(' + nv.utils.NaNtoZero((scale(d) + (isOrdinal ? scale.rangeBand() / 2 : 0))) + ',0)'
                             });
                     }
-                    if (staggerLabels)
-                        xTicks
-                            .attr('transform', function(d,i) {
-                                return 'translate(0,' + (i % 2 == 0 ? '0' : '12') + ')'
-                            });
 
                     break;
                 case 'right':

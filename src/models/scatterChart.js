@@ -178,7 +178,8 @@ nv.models.scatterChart = function() {
                 .width(availableWidth)
                 .height(availableHeight)
                 .color(data.map(function(d,i) {
-                    return d.color || color(d, i);
+                    d.color = d.color || color(d, i);
+                    return d.color;
                 }).filter(function(d,i) { return !data[i].disabled }));
 
             wrap.select('.nv-scatterWrap')
@@ -247,7 +248,7 @@ nv.models.scatterChart = function() {
                     .call(yAxis);
             }
 
-
+            // Setup Distribution
             if (showDistX) {
                 distX
                     .getData(scatter.x())
@@ -313,10 +314,10 @@ nv.models.scatterChart = function() {
 
             scatter.dispatch.on('elementMouseover.tooltip', function(evt) {
                 container.select('.nv-series-' + evt.seriesIndex + ' .nv-distx-' + evt.pointIndex)
-                    .attr('y1', evt.pos.top - availableHeight - margin.top);
+                    .attr('y1', evt.relativePos[1] - availableHeight);
                 container.select('.nv-series-' + evt.seriesIndex + ' .nv-disty-' + evt.pointIndex)
-                    .attr('x2', evt.pos.left + distX.size() - margin.left);
-                tooltip.position(evt.pos).data(evt).hidden(false);
+                    .attr('x2', evt.relativePos[0] + distX.size());
+                tooltip.data(evt).hidden(false);
             });
 
             //store old scales for use in transitions on update
@@ -357,26 +358,6 @@ nv.models.scatterChart = function() {
         defaultState:     {get: function(){return defaultState;}, set: function(_){defaultState=_;}},
         noData:     {get: function(){return noData;}, set: function(_){noData=_;}},
         duration:   {get: function(){return duration;}, set: function(_){duration=_;}},
-
-        // deprecated options
-        tooltips:    {get: function(){return tooltip.enabled();}, set: function(_){
-            // deprecated after 1.7.1
-            nv.deprecated('tooltips', 'use chart.tooltip.enabled() instead');
-            tooltip.enabled(!!_);
-        }},
-        tooltipContent:    {get: function(){return tooltip.contentGenerator();}, set: function(_){
-            // deprecated after 1.7.1
-            nv.deprecated('tooltipContent', 'use chart.tooltip.contentGenerator() instead');
-            tooltip.contentGenerator(_);
-        }},
-        tooltipXContent:    {get: function(){return tooltip.contentGenerator();}, set: function(_){
-            // deprecated after 1.7.1
-            nv.deprecated('tooltipContent', 'This option is removed, put values into main tooltip.');
-        }},
-        tooltipYContent:    {get: function(){return tooltip.contentGenerator();}, set: function(_){
-            // deprecated after 1.7.1
-            nv.deprecated('tooltipContent', 'This option is removed, put values into main tooltip.');
-        }},
 
         // options that require extra logic in the setter
         margin: {get: function(){return margin;}, set: function(_){

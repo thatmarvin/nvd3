@@ -21,9 +21,18 @@ nv.models.sparklinePlus = function() {
         , alignValue = true
         , rightAlignValue = false
         , noData = null
+        , dispatch = d3.dispatch('renderEnd')
         ;
+        
+    //============================================================
+    // Private Variables
+    //------------------------------------------------------------
+
+    var renderWatch = nv.utils.renderWatch(dispatch);
 
     function chart(selection) {
+        renderWatch.reset();
+        renderWatch.models(sparkline);
         selection.each(function(data) {
             var container = d3.select(this);
             nv.utils.initSVG(container);
@@ -31,7 +40,7 @@ nv.models.sparklinePlus = function() {
             var availableWidth = nv.utils.availableWidth(width, container, margin),
                 availableHeight = nv.utils.availableHeight(height, container, margin);
 
-            chart.update = function() { chart(selection) };
+            chart.update = function() { container.call(chart); };
             chart.container = this;
 
             // Display No Data message if there's nothing to show.
@@ -167,7 +176,7 @@ nv.models.sparklinePlus = function() {
             }
 
         });
-
+        renderWatch.renderEnd('sparklinePlus immediate');
         return chart;
     }
 
@@ -176,6 +185,7 @@ nv.models.sparklinePlus = function() {
     //------------------------------------------------------------
 
     // expose chart's sub-components
+    chart.dispatch = dispatch;
     chart.sparkline = sparkline;
 
     chart.options = nv.utils.optionsFunc.bind(chart);

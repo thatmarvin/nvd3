@@ -25,6 +25,8 @@ nv.models.stackedAreaChart = function() {
         , showYAxis = true
         , rightAlignYAxis = false
         , useInteractiveGuideline = false
+        , showTotalInTooltip = true
+        , totalLabel = 'TOTAL'
         , x //can be accessed via chart.xScale()
         , y //can be accessed via chart.yScale()
         , state = nv.utils.state()
@@ -342,7 +344,7 @@ nv.models.stackedAreaChart = function() {
 
             interactiveLayer.dispatch.on('elementMousemove', function(e) {
                 stacked.clearHighlights();
-                var singlePoint, pointIndex, pointXLocation, allData = [];
+                var singlePoint, pointIndex, pointXLocation, allData = [], valueSum = 0;
                 data
                     .filter(function(series, i) {
                         series.seriesIndex = i;
@@ -367,6 +369,10 @@ nv.models.stackedAreaChart = function() {
                             color: color(series,series.seriesIndex),
                             stackedValue: point.display
                         });
+
+                        if (showTotalInTooltip && stacked.style() != 'expand') {
+                          valueSum += tooltipValue;
+                        };
                     });
 
                 allData.reverse();
@@ -392,7 +398,16 @@ nv.models.stackedAreaChart = function() {
                         allData[indexToHighlight].highlight = true;
                 }
 
-                var xValue = xAxis.tickFormat()(chart.x()(singlePoint,pointIndex));
+                //If we are not in 'expand' mode, add a 'Total' row to the tooltip.
+                if (showTotalInTooltip && stacked.style() != 'expand' && allData.length >= 2) {
+                    allData.push({
+                        key: totalLabel,
+                        value: valueSum,
+                        total: true
+                    });
+                }
+
+                var xValue = chart.x()(singlePoint,pointIndex);
 
                 var valueFormatter = interactiveLayer.tooltip.valueFormatter();
                 // Keeps track of the tooltip valueFormatter if the chart changes to expanded view
@@ -411,7 +426,6 @@ nv.models.stackedAreaChart = function() {
                 }
 
                 interactiveLayer.tooltip
-                    .position({left: pointXLocation + margin.left, top: e.mouseY + margin.top})
                     .chartContainer(that.parentNode)
                     .valueFormatter(valueFormatter)
                     .data(
@@ -461,7 +475,7 @@ nv.models.stackedAreaChart = function() {
     stacked.dispatch.on('elementMouseover.tooltip', function(evt) {
         evt.point['x'] = stacked.x()(evt.point);
         evt.point['y'] = stacked.y()(evt.point);
-        tooltip.data(evt).position(evt.pos).hidden(false);
+        tooltip.data(evt).hidden(false);
     });
 
     stacked.dispatch.on('elementMouseout.tooltip', function(evt) {
@@ -497,18 +511,8 @@ nv.models.stackedAreaChart = function() {
         showControls:    {get: function(){return showControls;}, set: function(_){showControls=_;}},
         controlLabels:    {get: function(){return controlLabels;}, set: function(_){controlLabels=_;}},
         controlOptions:    {get: function(){return controlOptions;}, set: function(_){controlOptions=_;}},
-
-        // deprecated options
-        tooltips:    {get: function(){return tooltip.enabled();}, set: function(_){
-            // deprecated after 1.7.1
-            nv.deprecated('tooltips', 'use chart.tooltip.enabled() instead');
-            tooltip.enabled(!!_);
-        }},
-        tooltipContent:    {get: function(){return tooltip.contentGenerator();}, set: function(_){
-            // deprecated after 1.7.1
-            nv.deprecated('tooltipContent', 'use chart.tooltip.contentGenerator() instead');
-            tooltip.contentGenerator(_);
-        }},
+        showTotalInTooltip:      {get: function(){return showTotalInTooltip;}, set: function(_){showTotalInTooltip=_;}},
+        totalLabel:      {get: function(){return totalLabel;}, set: function(_){totalLabel=_;}},
 
         // options that require extra logic in the setter
         margin: {get: function(){return margin;}, set: function(_){
