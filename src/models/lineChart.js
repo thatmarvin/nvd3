@@ -520,8 +520,7 @@ nv.models.lineChart = function() {
                 updateBrushBG();
     
                 // Update Main (Focus)
-                var focusLinesWrap = g.select('.nv-focus .nv-linesWrap')
-                    .datum(
+                var focusLinesWrap = g.select('.nv-focus .nv-linesWrap').datum(
                     data
                         .filter(function(d) { return !d.disabled; })
                         .map(function(d,i) {

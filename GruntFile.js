@@ -36,6 +36,8 @@ module.exports = function(grunt) {
                     'src/models/line.js',
                     'src/models/legend.js',
                     'src/models/lineChart.js',
+                    'src/models/multiBar.js',
+                    'src/models/multiBarChart.js',
                     // example to exclude files: '!src/models/excludeMe*'
                 ],
                 dest: 'build/nv.d3.js'

@@ -64,7 +64,7 @@ nv.models.multiBar = function() {
                             x: d.x,
                             y: 0,
                             series: d.series,
-                            size: 0.01
+                            size: 0.01,
                         };}
                 )}];
 
@@ -205,7 +205,7 @@ nv.models.multiBar = function() {
                     return delay;
                 });
             groups
-                .attr('class', function(d,i) { return 'nv-group nv-series-' + i })
+                .attr('class', function(d,i) { return (d.classed || '') + ' nv-group nv-series-' + i })
                 .classed('hover', function(d) { return d.hover })
                 .style('fill', function(d,i){ return color(d, i) })
                 .style('stroke', function(d,i){ return color(d, i) });
@@ -228,7 +228,11 @@ nv.models.multiBar = function() {
                     .attr('transform', function(d,i) { return 'translate(' + x(getX(d,i)) + ',0)'; })
                 ;
             bars
-                .style('fill', function(d,i,j){ return color(d, j, i);  })
+                .style('fill', function(d,i,j){
+                    var pattern = 'url(#diagonalHatch-' + d.key + ')';
+                    console.log(d,j,i, color(d,j,i))
+                    return (d.key.indexOf('historical') > -1) ? pattern : d.color;
+                })
                 .style('stroke', function(d,i,j){ return color(d, j, i); })
                 .on('mouseover', function(d,i) { //TODO: figure out why j works above, but not here
                     d3.select(this).classed('hover', true);
@@ -273,7 +277,7 @@ nv.models.multiBar = function() {
                     d3.event.stopPropagation();
                 });
             bars
-                .attr('class', function(d,i) { return getY(d,i) < 0 ? 'nv-bar negative' : 'nv-bar positive'})
+                .attr('class', function(d,i) { return getY(d,i) < 0 ? 'nv-bar negative' : 'nv-bar positive' })
                 .attr('transform', function(d,i) { return 'translate(' + x(getX(d,i)) + ',0)'; })
 
             if (barColor) {
